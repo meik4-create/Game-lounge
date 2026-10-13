@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spiele-Lounge</title>
+<style>
+:root{--bg:#f3f1ec;--card:#fff;--text:#1c1c1a;--muted:#78766f;--board:#2b59c3;--hole:#e9eefb;--p0:#e5383b;--p1:#f6c000;--p2:#2a9d4a;--p3:#2b6fdc;--p4:#8e44ad;--p5:#f07f13;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141417;--card:#1f1f24;--text:#eee;--muted:#9a9aa2;--board:#2a4fa8;--hole:#14141a}}
+:root[data-theme="dark"]{--bg:#141417;--card:#1f1f24;--text:#eee;--muted:#9a9aa2;--board:#2a4fa8;--hole:#14141a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:480px;margin:0 auto;padding:18px 14px 30px;text-align:center}
+h1{margin:6px 0 4px;font-size:1.7rem}.sub,.code{color:var(--muted);margin:0 0 14px}
+.btn{display:block;width:100%;background:var(--board);color:#fff;border:0;border-radius:12px;padding:13px;font:inherit;font-weight:600;margin:8px 0;cursor:pointer}
+.btn.alt{background:var(--card);color:var(--text);border:1px solid var(--muted)}
+.join{display:flex;gap:8px;margin:8px 0}.join input,select{background:var(--card);color:var(--text);border:1px solid var(--muted);border-radius:12px;padding:10px;font:inherit}
+.join input{flex:1;min-width:0;text-transform:uppercase;letter-spacing:.2em;text-align:center}.join .btn{width:auto;margin:0;padding:10px 18px}
+section{display:none}.code b{color:var(--text);letter-spacing:.2em}
+#status{font-weight:700;font-size:1.1rem;min-height:1.6em;margin:10px 0}
+.dot{display:inline-block;width:.9em;height:.9em;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.g{display:grid;gap:6px;padding:8px;border-radius:14px;background:var(--board);touch-action:manipulation}
+.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}.g7{grid-template-columns:repeat(7,1fr)}
+.c{aspect-ratio:1;background:var(--hole);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2rem;cursor:pointer;color:#222}
+.g7 .c{border-radius:50%}
+.p0{background:var(--p0)}.p1{background:var(--p1)}.p2{background:var(--p2)}.p3{background:var(--p3)}.p4{background:var(--p4)}.p5{background:var(--p5)}
+.c.dn{opacity:.35}
+.nim{display:flex;gap:5px;justify-content:center;margin:12px 0}.nim span{font-size:2rem;cursor:pointer;padding:2px}
+.score{margin:8px 0;color:var(--muted)}.big{font-size:2.6rem;font-weight:800;margin:10px 0}
+.row{display:flex;gap:8px;margin-top:14px}.row .btn{margin:0}
+</style>
+</head>
+<body>
+<main>
+<h1>Spiele-Lounge</h1>
+<p class="sub" id="sub">Spielt zusammen – jeder auf seinem Handy.</p>
+<section id="menu">
+<button class="btn" id="host">Neuen Raum erstellen</button>
+<div class="join"><input id="code" maxlength="4" placeholder="CODE"><button class="btn" id="joinBtn">Beitreten</button></div>
+<button class="btn alt" id="local">Zusammen an einem Handy</button>
+<p class="sub" id="note"></p>
+</section>
+<section id="lobby">
+<div class="code" id="codeLine"></div><p id="who"></p>
+<div id="loc" style="display:none">Spieleranzahl: <select id="lp"><option>2</option><option>3</option><option>4</option></select></div>
+<div id="games"></div>
+<button class="btn alt" id="leave">Raum verlassen</button>
+</section>
+<section id="game">
+<div id="status"></div><div id="board"></div>
+<div class="row"><button class="btn alt" id="again">Nochmal</button><button class="btn alt" id="back">Spielauswahl</button></div>
+</section>
+</main>
+<script>
+var $=function(i){return document.getElementById(i)},NM=["Rot","Gelb","Grün","Blau","Lila","Orange"];
+function dot(p){return '<span class="dot" style="background:var(--p'+p+')"></span>'}
+function nx(s){s.t=(s.t+1)%s.P}
+function full(b){return b.every(function(x){return x!==null})}
+var G={
+ttt:{n:"Tic Tac Toe",e:"❌",min:2,max:2,
+init:function(P){return{P:2,b:Array(9).fill(null),t:0,w:null}},
+step:function(s,m){if(s.w!==null||!(m>=0&&m<9)||s.b[m]!==null)return null;s.b[m]=s.t;
+if([[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]].some(function(l){return l.every(function(i){return s.b[i]===s.t})}))s.w=s.t;else if(full(s.b))s.w=-1;nx(s);return s},
+view:function(s){return'<div class="g g3">'+s.b.map(function(x,i){return'<div class="c" data-m="'+i+'">'+(x===null?"":["❌","⭕"][x])+'</div>'}).join("")+'</div>'}},
+c4:{n:"Vier gewinnt",e:"🔴",min:2,max:2,
+init:function(){return{P:2,b:Array(42).fill(null),t:0,w:null}},
+step:function(s,c){if(s.w!==null||!(c>=0&&c<7)||s.b[c]!==null)return null;var r=5;while(s.b[r*7+c]!==null)r--;s.b[r*7+c]=s.t;
+var win=[[0,1],[1,0],[1,1],[1,-1]].some(function(d){var n=1;[1,-1].forEach(function(k){var y=r+d[0]*k,x=c+d[1]*k;while(y>=0&&y<6&&x>=0&&x<7&&s.b[y*7+x]===s.t){n++;y+=d[0]*k;x+=d[1]*k}});return n>=4});
+if(win)s.w=s.t;else if(full(s.b))s.w=-1;nx(s);return s},
+view:function(s){return'<div class="g g7">'+s.b.map(function(x,i){return'<div class="c'+(x===null?"":" p"+x)+'" data-m="'+i%7+'"></div>'}).join("")+'</div>'}},
+nim:{n:"Nim (Hölzchen)",e:"🪵",min:2,max:6,
+init:function(P){return{P:P,h:[3,5,7],t:0,w:null}},
+step:function(s,m){if(s.w!==null||!Array.isArray(m))return null;var i=m[0],k=m[1];if(!(i>=0&&i<3)||!Number.isInteger(k)||k<1||k>s.h[i])return null;s.h[i]-=k;
+if(s.h[0]+s.h[1]+s.h[2]===0)s.w=s.t;nx(s);return s},
+view:function(s){return'<p class="score">Tippe ein Hölzchen: es und alle rechts davon werden genommen. Wer das letzte nimmt, gewinnt.</p>'+s.h.map(function(n,i){var o="";for(var j=0;j<n;j++)o+="<span data-m='["+i+","+(n-j)+"]'>🪵</span>";return'<div class="nim">'+(o||"–")+'</div>'}).join("")}},
+pig:{n:"Schwein (Würfeln)",e:"🎲",min:2,max:6,
+init:function(P){return{P:P,sc:Array(P).fill(0),cur:0,last:0,t:0,w:null}},
+step:function(s,m){if(s.w!==null||!m)return null;
+if(m.r){if(!Number.isInteger(m.r)||m.r<1||m.r>6)return null;s.last=m.r;if(m.r===1){s.cur=0;nx(s)}else s.cur+=m.r;return s}
+if(m.h){s.sc[s.t]+=s.cur;s.cur=0;s.last=0;if(s.sc[s.t]>=50){s.w=s.t;return s}nx(s);return s}return null},
+view:function(s){return'<p class="score">Wer zuerst 50 Punkte erreicht, gewinnt. Bei einer 1 verfällt die Runde!</p><div class="big">'+(s.last?"🎲 "+s.last:"🎲")+'</div><p>Punkte in dieser Runde: <b>'+s.cur+'</b></p><div class="row"><button class="btn" data-m=\'{"roll":1}\'>Würfeln</button><button class="btn alt" data-m=\'{"h":1}\'>Behalten</button></div><p class="score">'+s.sc.map(function(x,i){return dot(i)+x}).join(" &nbsp; ")+'</p>'}},
+mem:{n:"Memory",e:"🃏",min:2,max:6,
+init:function(P,seed){var d=["🍎","🚗","🐶","⚽","🎸","🌵","🍕","🚀"],a=d.concat(d),x=seed||1;for(var i=15;i>0;i--){x=(x*1103515245+12345)%2147483648;var j=x%(i+1),t=a[i];a[i]=a[j];a[j]=t}return{P:P,a:a,o:[],d:Array(16).fill(false),sc:Array(P).fill(0),t:0,w:null}},
+step:function(s,i){if(s.w!==null||!(i>=0&&i<16)||s.d[i]||s.o.indexOf(i)>=0)return null;if(s.o.length===2)s.o=[];s.o.push(i);
+if(s.o.length===2){if(s.a[s.o[0]]===s.a[s.o[1]]){s.d[s.o[0]]=s.d[s.o[1]]=true;s.sc[s.t]++;s.o=[];if(s.d.every(Boolean)){var mx=Math.max.apply(null,s.sc),ws=s.sc.filter(function(v){return v===mx}).length;s.w=ws>1?-1:s.sc.indexOf(mx)}}else nx(s)}return s},
+view:function(s){return'<div class="g g4">'+s.a.map(function(x,i){var up=s.d[i]||s.o.indexOf(i)>=0;return'<div class="c'+(s.d[i]?" dn":"")+'" data-m="'+i+'">'+(up?x:"❔")+'</div>'}).join("")+'</div><p class="score">'+s.sc.map(function(x,i){return dot(i)+x}).join(" &nbsp; ")+'</p>'}}
+};
+var mode="menu",net=null,room=null,offs=[],gid=null,order=[],seed=1,moves=[],S=null;
+function cl(o){return JSON.parse(JSON.stringify(o))}
+function players(){return net?net.peers().filter(function(p){return p.presence&&typeof p.presence.t==="number"}).sort(function(a,b){return a.presence.t-b.presence.t||(a.peer<b.peer?-1:1)}):[]}
+function me(){var l=players();for(var i=0;i<l.length;i++)if(l[i].sameTab)return l[i].peer;return null}
+function myIdx(){return net?order.indexOf(me()):(S?S.t:-1)}
+function begin(g,ord,sd){gid=g;order=ord;seed=sd;moves=[];S=G[g].init(ord.length,sd);render()}
+function replay(g,ord,sd,mv){var s=G[g].init(ord.length,sd);for(var i=0;i<mv.length;i++){s=G[g].step(cl(s),mv[i]);if(!s)return null}return s}
+function render(){
+$("menu").style.display=mode==="menu"?"block":"none";
+$("lobby").style.display=mode!=="menu"&&!gid?"block":"none";
+$("game").style.display=mode!=="menu"&&gid?"block":"none";
+if(mode==="menu")return;
+if(!gid){var n=players().length;$("who").textContent=net?(n+(n===1?" Person im Raum – schick ihr den Code!":" Personen im Raum")):"";return}
+$("board").innerHTML=G[gid].view(S);
+var s=S,st,m=myIdx();
+if(s.w!==null)st=s.w===-1?"Unentschieden":dot(s.w)+NM[s.w]+" gewinnt! 🎉";
+else if(net&&m<0)st="Du schaust zu – "+dot(s.t)+NM[s.t]+" ist dran";
+else if(net)st=m===s.t?dot(m)+"Du bist dran!":dot(m)+"Du bist "+NM[m]+" – "+NM[s.t]+" ist dran";
+else st=dot(s.t)+NM[s.t]+" ist dran";
+$("status").innerHTML=st}
+function apply(m,role){var t=G[gid].step(cl(S),m);if(!t||role!==S.t)return false;S=t;moves.push(m);render();return true}
+function onMove(msg){var d=msg.data;if(!gid||!d||d.n!==moves.length)return;apply(d.m,order.indexOf(msg.peer))}
+function onStart(msg){var d=msg.data;if(!d||!G[d.g]||!Array.isArray(d.order))return;var g=G[d.g];if(d.order.length<g.min||d.order.length>g.max||!d.order.every(function(x){return typeof x==="string"}))return;begin(d.g,d.order,+d.seed||1)}
+function onState(msg){var d=msg.data;if(!d||!G[d.g]||!Array.isArray(d.order)||!Array.isArray(d.moves)||d.moves.length>200)return;
+if(gid===d.g&&d.moves.length<=moves.length)return;var s=replay(d.g,d.order,+d.seed||1,d.moves);if(!s)return;gid=d.g;order=d.order;seed=+d.seed||1;moves=d.moves;S=s;render()}
+function lost(){if(mode==="net"){net=null;mode="menu";gid=null;$("note").textContent="Verbindung verloren – bitte neu beitreten.";render()}}
+function joinRoom(name){return new Promise(function(res,rej){
+var ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host),h={},pc=[],P=[],me=null,pres={},ok=false,left=false;
+function tx(o){if(ws.readyState===1)ws.send(JSON.stringify(o))}
+var o={emit:function(t,d){tx({t:"emit",topic:t,data:d});return Promise.resolve()},
+on:function(t,f){(h[t]=h[t]||[]).push(f);return function(){h[t]=(h[t]||[]).filter(function(x){return x!==f})}},
+presence:function(p){Object.assign(pres,p);tx({t:"presence",presence:pres});return Promise.resolve()},
+peers:function(){return P},
+onPeers:function(f){pc.push(f);return function(){pc=pc.filter(function(x){return x!==f})}},
+leave:function(){left=true;ws.close();return Promise.resolve()}};
+ws.onopen=function(){tx({t:"join",room:name})};
+ws.onmessage=function(e){var m;try{m=JSON.parse(e.data)}catch(x){return}
+if(m.t==="hello"){me=m.peer;ok=true;res(o)}
+else if(m.t==="full"){rej({code:"full"})}
+else if(m.t==="msg"){(h[m.topic]||[]).slice().forEach(function(f){f({topic:m.topic,data:m.data,peer:m.peer,isMe:m.peer===me,sameTab:m.peer===me})})}
+else if(m.t==="peers"){P=m.peers.map(function(p){return{peer:p.peer,presence:p.presence||{},isMe:p.peer===me,sameTab:p.peer===me}});pc.slice().forEach(function(f){f({peers:P})})}};
+ws.onerror=function(){if(!ok)rej({code:"conn"})};
+ws.onclose=function(){if(!ok)rej({code:"conn"});else if(!left)lost()}})}
+async function connect(code){
+$("note").textContent="Verbinde … (beim ersten Mal kann das bis zu einer Minute dauern)";
+try{net=await joinRoom("sl-"+code.toLowerCase())}catch(e){net=null;$("note").textContent=e&&e.code==="full"?"Der Raum ist voll.":"Keine Verbindung zum Server. Versuch es gleich nochmal.";return}
+mode="net";gid=null;net.presence({t:Date.now()});
+offs=[net.on("move",onMove),net.on("start",onStart),net.on("state",onState),
+net.on("sync",function(m){if(!m.isMe&&gid)net.emit("state",{g:gid,order:order,seed:seed,moves:moves})}),
+net.on("stop",function(m){if(order.indexOf(m.peer)>=0||!gid){gid=null;render()}}),net.onPeers(render)];
+$("codeLine").innerHTML="Raum-Code: <b>"+code.toUpperCase()+"</b><br>Freunde geben diesen Code ein.";$("loc").style.display="none";
+render();net.emit("sync",{})}
+function startGame(g,sd){var d=G[g];
+if(net){var l=players().slice(0,d.max).map(function(p){return p.peer});if(l.length<d.min){$("who").textContent="Für "+d.n+" brauchst du mindestens "+d.min+" Mitspieler im Raum.";return}net.emit("start",{g:g,order:l,seed:sd})}
+else{var P=Math.max(d.min,Math.min(d.max,+$("lp").value)),o=[];for(var i=0;i<P;i++)o.push(String(i));begin(g,o,sd)}}
+function rnd(){return 1+Math.floor(Math.random()*1e6)}
+function leave(){offs.forEach(function(f){try{f()}catch(e){}});offs=[];if(net){try{net.leave()}catch(e){}}net=null;mode="menu";gid=null;$("note").textContent="";render()}
+Object.keys(G).forEach(function(k){var b=document.createElement("button");b.className="btn";b.textContent=G[k].e+" "+G[k].n+" ("+(G[k].min===G[k].max?G[k].min:G[k].min+"–"+G[k].max)+" Spieler)";b.onclick=function(){startGame(k,rnd())};$("games").appendChild(b)});
+$("host").onclick=function(){var a="abcdefghjkmnpqrstuvwxyz23456789",c="";for(var i=0;i<4;i++)c+=a[Math.floor(Math.random()*a.length)];connect(c)};
+$("joinBtn").onclick=function(){var v=$("code").value.trim().toLowerCase();if(/^[a-z0-9]{4}$/.test(v))connect(v);else $("note").textContent="Bitte den 4-stelligen Code eingeben."};
+$("local").onclick=function(){mode="local";net=null;gid=null;$("codeLine").textContent="Lokales Spiel";$("loc").style.display="block";render()};
+$("leave").onclick=leave;
+$("again").onclick=function(){startGame(gid,rnd())};
+$("back").onclick=function(){if(net)net.emit("stop",{});else{gid=null;render()}};
+$("board").onclick=function(e){var el=e.target.closest("[data-m]");if(!el||!gid||S.w!==null)return;var m=JSON.parse(el.dataset.m);if(m&&m.roll)m={r:1+Math.floor(Math.random()*6)};
+if(net){if(myIdx()!==S.t)return;net.emit("move",{n:moves.length,m:m})}else apply(m,S.t)};
+render();
+</script>
+</body>
+</html>
